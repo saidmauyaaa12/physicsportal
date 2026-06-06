@@ -1,0 +1,1029 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A-Level Physics: Advanced SHM Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a; /* tailwind slate-900 */
+            color: #f8fafc; /* tailwind slate-50 */
+            overflow: hidden; /* Prevent scrolling, act like an app */
+            user-select: none;
+        }
+
+        .math-font {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+        /* Range Slider Styling */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #22d3ee; /* cyan-400 */
+            cursor: pointer;
+            margin-top: -6px;
+            box-shadow: 0 0 10px rgba(34, 211, 238, 0.5);
+            transition: transform 0.1s;
+        }
+        input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #334155;
+            border-radius: 2px;
+        }
+        input[type=range]:focus { outline: none; }
+
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .neon-text-cyan { text-shadow: 0 0 8px rgba(34, 211, 238, 0.6); }
+        .neon-text-green { text-shadow: 0 0 8px rgba(74, 222, 128, 0.6); }
+        .neon-text-red { text-shadow: 0 0 8px rgba(248, 113, 113, 0.6); }
+
+        /* Tooltip */
+        .tooltip .tooltip-text {
+            visibility: hidden;
+            background-color: #1e293b;
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 5px 10px;
+            position: absolute;
+            z-index: 50;
+            bottom: 120%;
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 0.75rem;
+            white-space: nowrap;
+            border: 1px solid #475569;
+        }
+        .tooltip:hover .tooltip-text { visibility: visible; opacity: 1; }
+
+        canvas { cursor: crosshair; display: block; width: 100%; height: 100%; }
+
+        .scene-transition { animation: fadeIn 0.5s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulse-red { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); } 70% { box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
+        
+        .resonance-warning {
+            animation: pulse-red 1s infinite;
+            border-color: #ef4444 !important;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="h-14 border-b border-slate-700 bg-slate-900 flex items-center justify-between px-6 flex-shrink-0 z-20">
+        <div class="flex items-center gap-4">
+            <h1 class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-500">Physics<span class="text-slate-100">Lab</span> | Ch. 17 SHM</h1>
+            
+            <!-- Scene Tabs -->
+            <div class="flex bg-slate-800 rounded-lg p-1 gap-1 ml-8">
+                <button onclick="changeScene(1)" id="tab-1" class="px-4 py-1.5 rounded-md text-sm font-semibold bg-cyan-600 text-white transition-colors">1. The Spring Lab</button>
+                <button onclick="changeScene(2)" id="tab-2" class="px-4 py-1.5 rounded-md text-sm font-semibold text-slate-400 hover:text-slate-200 transition-colors">2. Energy Arena</button>
+                <button onclick="changeScene(3)" id="tab-3" class="px-4 py-1.5 rounded-md text-sm font-semibold text-slate-400 hover:text-slate-200 transition-colors">3. Damping Chamber</button>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-4">
+            <div id="badge-container" class="flex gap-2">
+                <!-- Badges injected here -->
+            </div>
+            <button onclick="openQuiz()" class="bg-fuchsia-600 hover:bg-fuchsia-500 text-white px-4 py-1.5 rounded-md text-sm font-semibold transition-colors flex items-center gap-2">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                Mini Quiz
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Layout -->
+    <main class="flex-1 flex overflow-hidden relative">
+        
+        <!-- Left Sidebar: Formulas & Info -->
+        <aside class="w-64 border-r border-slate-700 bg-slate-800/50 flex flex-col p-4 overflow-y-auto z-10 hidden md:flex">
+            <h2 class="text-xs uppercase tracking-wider text-slate-400 font-bold mb-4">Formula Reference</h2>
+            
+            <div class="space-y-4 text-sm">
+                <div class="p-3 rounded bg-slate-800 border border-slate-700">
+                    <p class="text-xs text-slate-400 mb-1">Defining Equation</p>
+                    <p class="math-font text-cyan-300">a = -&omega;&sup2;x</p>
+                </div>
+                <div class="p-3 rounded bg-slate-800 border border-slate-700">
+                    <p class="text-xs text-slate-400 mb-1">Displacement</p>
+                    <p class="math-font text-cyan-300">x = x<sub>0</sub> sin(&omega;t)</p>
+                </div>
+                <div class="p-3 rounded bg-slate-800 border border-slate-700">
+                    <p class="text-xs text-slate-400 mb-1">Velocity</p>
+                    <p class="math-font text-green-300">v = v<sub>0</sub> cos(&omega;t)</p>
+                    <p class="math-font text-green-300 mt-1">v = &plusmn;&omega;&radic;(x<sub>0</sub>&sup2; - x&sup2;)</p>
+                </div>
+                <div class="p-3 rounded bg-slate-800 border border-slate-700">
+                    <p class="text-xs text-slate-400 mb-1">Angular Frequency</p>
+                    <p class="math-font text-yellow-300">&omega; = 2&pi;f = 2&pi;/T</p>
+                    <p class="math-font text-yellow-300 mt-1">&omega; = &radic;(k/m)</p>
+                </div>
+                <div class="p-3 rounded bg-slate-800 border border-slate-700" id="energy-formulas">
+                    <p class="text-xs text-slate-400 mb-1">Energy</p>
+                    <p class="math-font text-orange-300">E<sub>k</sub> = &frac12;mv&sup2;</p>
+                    <p class="math-font text-blue-300">E<sub>p</sub> = &frac12;kx&sup2;</p>
+                    <p class="math-font text-fuchsia-300">E<sub>tot</sub> = &frac12;m&omega;&sup2;x<sub>0</sub>&sup2;</p>
+                </div>
+            </div>
+
+            <div class="mt-auto pt-6">
+                <div class="p-3 rounded bg-slate-900 border border-slate-700 tooltip relative cursor-help">
+                    <p class="text-xs text-slate-400 mb-1">Live Variables</p>
+                    <p class="math-font text-xs" id="live-vars">Loading...</p>
+                    <span class="tooltip-text">Real-time internal state.</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Center: Simulation Canvas -->
+        <div class="flex-1 relative scene-transition" id="canvas-container">
+            <!-- UI Overlay within Canvas -->
+            <div class="absolute top-4 left-4 z-10 flex gap-2" id="scene-controls">
+                <!-- Injected via JS based on scene -->
+            </div>
+            
+            <div id="resonance-alert" class="absolute top-4 left-1/2 -translate-x-1/2 z-10 bg-red-600 text-white px-4 py-1 rounded font-bold text-xl tracking-widest hidden shadow-[0_0_20px_rgba(220,38,38,0.8)]">
+                RESONANCE DETECTED
+            </div>
+
+            <canvas id="sim-canvas"></canvas>
+        </div>
+
+        <!-- Right Sidebar: Challenges -->
+        <aside class="w-80 border-l border-slate-700 bg-slate-800/50 flex flex-col z-10">
+            <div class="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-800">
+                <h2 class="text-sm uppercase tracking-wider text-slate-300 font-bold flex items-center gap-2">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-yellow-400"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                    Think About It
+                </h2>
+            </div>
+            <div class="flex-1 overflow-y-auto p-4 space-y-4" id="challenges-container">
+                <!-- Challenges injected via JS -->
+            </div>
+            
+            <div class="p-4 border-t border-slate-700 bg-slate-900">
+                <p class="text-xs text-slate-400 mb-2">Simulation Speed</p>
+                <div class="flex gap-2">
+                    <button onclick="setSimSpeed(0.25)" class="sim-speed-btn flex-1 py-1 rounded bg-slate-800 text-xs hover:bg-slate-700">0.25x</button>
+                    <button onclick="setSimSpeed(0.5)" class="sim-speed-btn flex-1 py-1 rounded bg-slate-800 text-xs hover:bg-slate-700">0.5x</button>
+                    <button onclick="setSimSpeed(1)" class="sim-speed-btn flex-1 py-1 rounded bg-cyan-600 text-white text-xs">1.0x</button>
+                    <button onclick="setSimSpeed(2)" class="sim-speed-btn flex-1 py-1 rounded bg-slate-800 text-xs hover:bg-slate-700">2.0x</button>
+                </div>
+            </div>
+        </aside>
+    </main>
+
+    <!-- Bottom Footer: Global Physics Controls -->
+    <footer class="glass-panel border-t border-slate-700 p-4 z-20 flex-shrink-0">
+        <div class="flex items-center gap-6 max-w-6xl mx-auto">
+            
+            <!-- Play/Pause -->
+            <div class="flex gap-2">
+                <button onclick="togglePlay()" id="btn-play" class="w-12 h-12 rounded-full bg-cyan-500 hover:bg-cyan-400 flex items-center justify-center text-slate-900 transition-transform hover:scale-105">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="none" id="icon-play"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                </button>
+                <button onclick="resetSim()" class="w-12 h-12 rounded-full bg-slate-700 hover:bg-slate-600 flex items-center justify-center transition-transform hover:scale-105 tooltip relative">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><polyline points="3 3 3 8 8 8"></polyline></svg>
+                    <span class="tooltip-text">Reset System</span>
+                </button>
+            </div>
+
+            <!-- Sliders -->
+            <div class="flex-1 grid grid-cols-1 md:grid-cols-3 gap-8">
+                
+                <div class="tooltip relative">
+                    <div class="flex justify-between mb-1">
+                        <label class="text-sm font-semibold text-slate-300">Mass (m)</label>
+                        <span id="val-m" class="text-sm text-cyan-400 math-font">1.0 kg</span>
+                    </div>
+                    <input type="range" id="slider-m" min="0.1" max="5.0" step="0.1" value="1.0" oninput="updateState('m', this.value)">
+                    <span class="tooltip-text">Inertia. More mass = lower frequency.</span>
+                </div>
+
+                <div class="tooltip relative">
+                    <div class="flex justify-between mb-1">
+                        <label class="text-sm font-semibold text-slate-300">Spring Constant (k)</label>
+                        <span id="val-k" class="text-sm text-cyan-400 math-font">10 N/m</span>
+                    </div>
+                    <input type="range" id="slider-k" min="1" max="50" step="1" value="10" oninput="updateState('k', this.value)">
+                    <span class="tooltip-text">Stiffness. Higher k = higher frequency.</span>
+                </div>
+
+                <div class="tooltip relative">
+                    <div class="flex justify-between mb-1">
+                        <label class="text-sm font-semibold text-slate-300">Amplitude (x₀)</label>
+                        <span id="val-A" class="text-sm text-cyan-400 math-font">2.0 m</span>
+                    </div>
+                    <input type="range" id="slider-A" min="0.5" max="4.0" step="0.1" value="2.0" oninput="updateState('A', this.value)">
+                    <span class="tooltip-text">Maximum displacement from equilibrium.</span>
+                </div>
+
+            </div>
+        </div>
+    </footer>
+
+    <!-- Quiz Modal Overlay (Hidden by default) -->
+    <div id="quiz-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center opacity-0 transition-opacity">
+        <div class="bg-slate-800 border border-slate-600 p-8 rounded-xl max-w-lg w-full shadow-2xl transform scale-95 transition-transform" id="quiz-content">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-white flex items-center gap-2">
+                    <span class="bg-fuchsia-600 p-1.5 rounded-lg"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg></span>
+                    Knowledge Check
+                </h2>
+                <button onclick="closeQuiz()" class="text-slate-400 hover:text-white"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+            </div>
+            
+            <div id="quiz-question-container">
+                <!-- Quiz questions injected here -->
+            </div>
+            
+            <div id="quiz-feedback" class="mt-4 p-3 rounded font-semibold text-center hidden"></div>
+        </div>
+    </div>
+
+    <!-- JavaScript Physics Engine & UI Logic -->
+    <script>
+        // --- Core State Management ---
+        const state = {
+            scene: 1,           // 1: Spring, 2: Energy, 3: Damping
+            playing: true,
+            simSpeed: 1.0,
+            time: 0,
+            
+            // Physical Parameters
+            m: 1.0,             // Mass (kg)
+            k: 10.0,            // Spring Constant (N/m)
+            A: 2.0,             // Initial Amplitude (m)
+            
+            // Dynamic Variables
+            x: 2.0,             // Displacement
+            v: 0.0,             // Velocity
+            a: 0.0,             // Acceleration
+            
+            // Derived (updated every frame)
+            omega: 0,
+            period: 0,
+            energyTot: 0,
+            energyKin: 0,
+            energyPot: 0,
+
+            // Scene 1 Specifics
+            showVectors: true,
+            showPhasor: true,
+            history: [],        // Stores {t, x, v, a} for graphs
+
+            // Scene 2 Specifics
+            freezeFrame: false,
+
+            // Scene 3 Specifics
+            dampingMode: 'none', // 'none', 'light', 'critical', 'heavy'
+            forcingEnabled: false,
+            drivingFreq: 3.16,   // rad/s
+            drivingForce: 5.0,
+            particles: [],       // For visual fluid drag
+
+            // Gamification/Tracking
+            badges: new Set(),
+            maxAmplitudeReached: false
+        };
+
+        const canvas = document.getElementById('sim-canvas');
+        const ctx = canvas.getContext('2d');
+        let animationId;
+        let lastTime = 0;
+
+        // --- Educational Content Data ---
+        const challengesData = {
+            1: [
+                { q: "If you double the mass, what happens to the period? Predict, then test it.", a: "The period increases by a factor of √2 (~1.41x). Period T = 2π√(m/k). Mass and period are not linearly related!" },
+                { q: "At what point is the magnitude of acceleration highest?", a: "At maximum displacement (x = ±x₀). Because a = -ω²x. When x is max, the restoring force is max." },
+                { q: "Watch the phasor dot and the mass. How are they related?", a: "SHM is the 1D projection of uniform circular motion. The dot's y-position matches the mass exactly." }
+            ],
+            2: [
+                { q: "Why does the total energy bar never change height?", a: "Conservation of Energy. In an ideal SHM system without friction, energy continuously swaps between Kinetic and Potential, but their sum is constant." },
+                { q: "At x = 0 (equilibrium), what is the Potential Energy?", a: "Zero. Ep = ½kx². If x=0, Ep=0. All energy is Kinetic here, hence maximum velocity." },
+                { q: "Double the Amplitude slider. What happens to Total Energy?", a: "It quadruples! Total Energy E = ½mω²x₀². Energy is proportional to the square of amplitude." }
+            ],
+            3: [
+                { q: "Which damping mode returns the system to equilibrium fastest without oscillating?", a: "Critical Damping. It dissipates energy just fast enough to prevent overshoot. Crucial for car suspensions!" },
+                { q: "Turn on Forcing and set Driving Freq roughly equal to Natural Freq. What happens?", a: "RESONANCE! The amplitude grows dramatically because the driving force pushes in phase with the natural velocity, constantly adding energy." }
+            ]
+        };
+
+        const quizzes = {
+            1: { q: "In SHM, acceleration is directly proportional and opposite in direction to:", opts: ["Velocity", "Displacement", "Mass", "Time"], ans: 1 },
+            2: { q: "The kinetic energy of an oscillator is maximum when:", opts: ["Displacement is max", "Acceleration is max", "Displacement is zero", "Potential energy is max"], ans: 2 },
+            3: { q: "Resonance occurs when the driving frequency is equal to the:", opts: ["Damping frequency", "Natural frequency", "Nyquist frequency", "Amplitude"], ans: 1 }
+        };
+
+        // --- Initialization & Resizing ---
+        function resizeCanvas() {
+            // Handle high DPI displays for crisp rendering
+            const rect = canvas.parentElement.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
+            canvas.style.width = `${rect.width}px`;
+            canvas.style.height = `${rect.height}px`;
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        function init() {
+            resizeCanvas();
+            updateDerivedPhysics();
+            buildUI();
+            lastTime = performance.now();
+            loop(lastTime);
+        }
+
+        // --- Physics Engine Updates ---
+        function updateState(param, value) {
+            const numVal = parseFloat(value);
+            state[param] = numVal;
+            document.getElementById(`val-${param}`).innerText = `${numVal.toFixed(1)} ${param === 'm'?'kg':param==='k'?'N/m':'m'}`;
+            
+            if (param === 'A') {
+                // If user manually changes amplitude, reset position to new max
+                state.x = numVal;
+                state.v = 0;
+                if (!state.playing) { updateDerivedPhysics(); draw(); } // Force redraw if paused
+                
+                if (numVal >= 4.0 && !state.badges.has('Limit Tester')) unlockBadge('Limit Tester', '🎯');
+            }
+            if (param === 'm' || param === 'k') {
+                if (!state.playing) { updateDerivedPhysics(); draw(); }
+            }
+        }
+
+        function updateDerivedPhysics() {
+            state.omega = Math.sqrt(state.k / state.m);
+            state.period = 2 * Math.PI / state.omega;
+            state.energyPot = 0.5 * state.k * state.x * state.x;
+            state.energyKin = 0.5 * state.m * state.v * state.v;
+            state.energyTot = state.energyPot + state.energyKin;
+            
+            // Update sidebar info
+            document.getElementById('live-vars').innerHTML = 
+                `&omega; = ${state.omega.toFixed(2)} rad/s<br>` +
+                `T = ${state.period.toFixed(2)} s<br>` +
+                `x = ${state.x.toFixed(2)} m<br>` +
+                `v = ${state.v.toFixed(2)} m/s<br>` +
+                `a = ${state.a.toFixed(2)} m/s&sup2;`;
+        }
+
+        function integratePhysics(dt) {
+            if (!state.playing || state.freezeFrame) return;
+
+            // Cap dt to prevent explosions if tab is backgrounded
+            const cappedDt = Math.min(dt, 0.05) * state.simSpeed;
+            
+            let F_net = -state.k * state.x; // Hooke's Law
+
+            // Damping & Forcing (Scene 3 only)
+            if (state.scene === 3) {
+                let b = 0;
+                const b_crit = 2 * Math.sqrt(state.m * state.k);
+                
+                if (state.dampingMode === 'light') b = 0.1 * b_crit;
+                else if (state.dampingMode === 'critical') b = b_crit;
+                else if (state.dampingMode === 'heavy') b = 3.0 * b_crit;
+
+                F_net -= b * state.v; // Drag force
+
+                if (state.forcingEnabled) {
+                    F_net += state.drivingForce * Math.cos(state.drivingFreq * state.time);
+                    
+                    // Check resonance for visual effect
+                    const isResonant = Math.abs(state.drivingFreq - state.omega) < 0.2;
+                    document.getElementById('resonance-alert').style.display = (isResonant && state.x > state.A*1.5) ? 'block' : 'none';
+                    if (isResonant && !state.badges.has('Resonance Hunter')) unlockBadge('Resonance Hunter', '🔊');
+                } else {
+                    document.getElementById('resonance-alert').style.display = 'none';
+                }
+            }
+
+            // Semi-implicit Euler integration (stable for oscillators)
+            state.a = F_net / state.m;
+            state.v += state.a * cappedDt;
+            state.x += state.v * cappedDt;
+            state.time += cappedDt;
+
+            // Record history for graphs
+            state.history.push({ t: state.time, x: state.x, v: state.v, a: state.a });
+            if (state.history.length > 300) state.history.shift(); // Keep last ~5 seconds
+            
+            updateDerivedPhysics();
+        }
+
+        // --- Main Rendering Loop ---
+        function loop(timestamp) {
+            const dt = (timestamp - lastTime) / 1000; // seconds
+            lastTime = timestamp;
+
+            integratePhysics(dt);
+            draw();
+
+            animationId = requestAnimationFrame(loop);
+        }
+
+        function draw() {
+            const cw = canvas.clientWidth;
+            const ch = canvas.clientHeight;
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, cw, ch);
+            
+            // Grid background (subtle)
+            drawGrid(cw, ch);
+
+            if (state.scene === 1) drawScene1(cw, ch);
+            else if (state.scene === 2) drawScene2(cw, ch);
+            else if (state.scene === 3) drawScene3(cw, ch);
+        }
+
+        function drawGrid(w, h) {
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            for (let x = 0; x < w; x += 50) { ctx.moveTo(x, 0); ctx.lineTo(x, h); }
+            for (let y = 0; y < h; y += 50) { ctx.moveTo(0, y); ctx.lineTo(w, y); }
+            ctx.stroke();
+        }
+
+        // --- Scene 1 Rendering (Spring Lab) ---
+        function drawScene1(w, h) {
+            const scaleY = 40; // pixels per meter
+            const originX = w * 0.3;
+            const originY = h * 0.5;
+            
+            const massY = originY + state.x * scaleY;
+
+            // 1. Draw Support Line
+            ctx.strokeStyle = '#475569';
+            ctx.lineWidth = 4;
+            ctx.beginPath(); ctx.moveTo(originX - 40, originY - 150); ctx.lineTo(originX + 40, originY - 150); ctx.stroke();
+            
+            // Draw hashing
+            ctx.lineWidth = 2;
+            for(let i=-30; i<=30; i+=10) { ctx.beginPath(); ctx.moveTo(originX+i, originY-150); ctx.lineTo(originX+i+10, originY-160); ctx.stroke(); }
+
+            // 2. Draw Spring
+            drawSpring(originX, originY - 150, originX, massY - 20, 15, 20);
+
+            // 3. Draw Mass
+            const size = 30 + (state.m * 5); // Visual size based on mass
+            ctx.fillStyle = '#3b82f6'; // blue-500
+            ctx.shadowColor = '#3b82f6';
+            ctx.shadowBlur = 15;
+            ctx.fillRect(originX - size/2, massY - size/2, size, size);
+            ctx.shadowBlur = 0; // reset
+            ctx.strokeStyle = '#fff';
+            ctx.strokeRect(originX - size/2, massY - size/2, size, size);
+            
+            ctx.fillStyle = '#fff';
+            ctx.font = '12px Inter';
+            ctx.textAlign = 'center';
+            ctx.fillText(`${state.m.toFixed(1)}kg`, originX, massY + 4);
+
+            // 4. Draw Vectors
+            if (state.showVectors) {
+                const vecScale = 10;
+                // Velocity (Green)
+                if (Math.abs(state.v) > 0.1) drawArrow(originX + size/2 + 10, massY, state.v * vecScale, '#4ade80', 'v');
+                // Acceleration (Red)
+                if (Math.abs(state.a) > 0.1) drawArrow(originX - size/2 - 10, massY, state.a * vecScale * 0.5, '#f87171', 'a');
+            }
+
+            // 5. Draw Phasor (Reference Circle)
+            if (state.showPhasor) {
+                const cx = w * 0.1;
+                const cy = originY;
+                const r = state.A * scaleY;
+                
+                // Circle
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+                ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.stroke();
+                
+                // Axes
+                ctx.beginPath(); ctx.moveTo(cx-r-10, cy); ctx.lineTo(cx+r+10, cy); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(cx, cy-r-10); ctx.lineTo(cx, cy+r+10); ctx.stroke();
+
+                // Phase Dot position
+                // x = A cos(wt), y = A sin(wt). 
+                // Our physical x is up/down, so let's map phase angle carefully.
+                // Assuming x = A cos(wt) where x is displacement.
+                const phase = state.omega * state.time;
+                const dotX = cx + r * Math.sin(phase);
+                const dotY = cy + r * Math.cos(phase); // matching the vertical mass
+
+                // Connect to mass
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath(); ctx.moveTo(dotX, dotY); ctx.lineTo(originX, massY); ctx.stroke();
+                ctx.setLineDash([]);
+
+                // Dot
+                ctx.fillStyle = '#facc15'; // yellow-400
+                ctx.shadowColor = '#facc15'; ctx.shadowBlur = 10;
+                ctx.beginPath(); ctx.arc(dotX, dotY, 6, 0, Math.PI*2); ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+
+            // 6. Draw Live Graphs (x, v, a)
+            const graphX = originX + 150;
+            const graphW = w - graphX - 40;
+            drawTimeseriesGraph(graphX, originY, graphW, 100, 'x', '#22d3ee', scaleY);
+            drawTimeseriesGraph(graphX, originY - 140, graphW, 50, 'v', '#4ade80', 10);
+            drawTimeseriesGraph(graphX, originY + 140, graphW, 50, 'a', '#f87171', 5);
+        }
+
+        // Helper: Draw Spring
+        function drawSpring(x1, y1, x2, y2, coils, width) {
+            ctx.strokeStyle = '#94a3b8'; // slate-400
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            
+            const dy = (y2 - y1) / (coils + 1);
+            let currentY = y1 + dy/2;
+            
+            for (let i = 0; i < coils; i++) {
+                const dir = (i % 2 === 0) ? 1 : -1;
+                ctx.lineTo(x1 + width * dir, currentY);
+                currentY += dy;
+            }
+            ctx.lineTo(x2, y2);
+            ctx.stroke();
+        }
+
+        // Helper: Draw Arrow
+        function drawArrow(x, y, length, color, label) {
+            ctx.strokeStyle = color;
+            ctx.fillStyle = color;
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x, y + length);
+            ctx.stroke();
+
+            // Arrowhead
+            const headlen = 8;
+            const angle = length > 0 ? Math.PI/2 : -Math.PI/2;
+            ctx.beginPath();
+            ctx.moveTo(x, y + length);
+            ctx.lineTo(x - headlen * Math.cos(angle - Math.PI/6), y + length - headlen * Math.sin(angle - Math.PI/6));
+            ctx.lineTo(x - headlen * Math.cos(angle + Math.PI/6), y + length - headlen * Math.sin(angle + Math.PI/6));
+            ctx.fill();
+
+            // Label
+            ctx.font = 'bold 12px Inter';
+            ctx.fillText(label, x + 12, y + length/2);
+        }
+
+        // Helper: Grapher
+        function drawTimeseriesGraph(x, y, w, h, prop, color, scale) {
+            // Draw Axes
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(x, y); ctx.lineTo(x + w, y); // time axis
+            ctx.moveTo(x, y - h); ctx.lineTo(x, y + h); // value axis
+            ctx.stroke();
+
+            ctx.fillStyle = color;
+            ctx.font = '12px Inter';
+            ctx.textAlign = 'right';
+            ctx.fillText(prop, x - 10, y - h + 10);
+
+            if (state.history.length < 2) return;
+
+            // Plot line
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.shadowColor = color;
+            ctx.shadowBlur = 5;
+            ctx.beginPath();
+
+            const tMax = state.history[state.history.length-1].t;
+            const tMin = state.history[0].t;
+            const tSpan = tMax - tMin || 1;
+
+            for (let i = 0; i < state.history.length; i++) {
+                const pt = state.history[i];
+                const px = x + ((pt.t - tMin) / tSpan) * w;
+                const py = y - (pt[prop] * scale);
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.stroke();
+            ctx.shadowBlur = 0; // reset
+            
+            // Draw current value dot
+            const last = state.history[state.history.length-1];
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(x + w, y - (last[prop] * scale), 4, 0, Math.PI*2);
+            ctx.fill();
+        }
+
+
+        // --- Scene 2 Rendering (Energy Arena) ---
+        function drawScene2(w, h) {
+            const originX = w * 0.4;
+            const originY = h * 0.8;
+            const scaleX = 80; // px per m
+            const scaleY = 30; // px per Joule (visual)
+
+            // 1. Draw Parabolic Well (Ep = 1/2 k x^2)
+            ctx.strokeStyle = 'rgba(148, 163, 184, 0.5)';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            for (let px = -4; px <= 4; px += 0.1) {
+                const canvasX = originX + px * scaleX;
+                const energy = 0.5 * state.k * px * px;
+                const canvasY = originY - energy * scaleY;
+                if (px === -4) ctx.moveTo(canvasX, canvasY);
+                else ctx.lineTo(canvasX, canvasY);
+            }
+            ctx.stroke();
+
+            // 2. Draw the Ball
+            const ballX = originX + state.x * scaleX;
+            const ballY = originY - state.energyPot * scaleY;
+            const radius = 15;
+
+            // Color based on velocity (Orange = max speed, Blue = zero speed)
+            const vRatio = Math.abs(state.v) / (state.A * state.omega); // 0 to 1
+            const rCol = Math.floor(59 + vRatio * (249 - 59));
+            const gCol = Math.floor(130 - vRatio * (130 - 115));
+            const bCol = Math.floor(246 - vRatio * (246 - 22));
+            const ballColor = `rgb(${rCol}, ${gCol}, ${bCol})`;
+
+            ctx.fillStyle = ballColor;
+            ctx.shadowColor = ballColor;
+            ctx.shadowBlur = 20;
+            ctx.beginPath();
+            ctx.arc(ballX, ballY, radius, 0, Math.PI*2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.strokeStyle = '#fff'; ctx.lineWidth=2; ctx.stroke();
+
+            // 3. Draw Energy Bar Charts
+            const chartX = w * 0.75;
+            const chartY = h * 0.7;
+            const barW = 40;
+            const gap = 20;
+            
+            // Background track
+            ctx.fillStyle = 'rgba(255,255,255,0.05)';
+            const maxE = 0.5 * 5.0 * 50 * 16; // absolute max possible in sim to scale
+            const visualH = 300;
+            ctx.fillRect(chartX, chartY - visualH, barW, visualH);
+            ctx.fillRect(chartX + barW + gap, chartY - visualH, barW, visualH);
+            ctx.fillRect(chartX + (barW + gap)*2, chartY - visualH, barW, visualH);
+
+            // Calculate heights relative to current max possible energy given sliders
+            const currentMaxE = 0.5 * state.m * state.omega * state.omega * state.A * state.A;
+            const scaleBar = visualH / (currentMaxE * 1.2 || 1); // dynamic scale
+
+            // PE Bar (Blue)
+            ctx.fillStyle = '#3b82f6';
+            const hPE = state.energyPot * scaleBar;
+            ctx.fillRect(chartX, chartY - hPE, barW, hPE);
+            
+            // KE Bar (Orange)
+            ctx.fillStyle = '#f97316';
+            const hKE = state.energyKin * scaleBar;
+            ctx.fillRect(chartX + barW + gap, chartY - hKE, barW, hKE);
+            
+            // Total Bar (Fuchsia)
+            ctx.fillStyle = '#d946ef';
+            const hTot = state.energyTot * scaleBar;
+            ctx.fillRect(chartX + (barW + gap)*2, chartY - hTot, barW, hTot);
+
+            // Labels
+            ctx.fillStyle = '#fff'; ctx.font = '14px Inter'; ctx.textAlign = 'center';
+            ctx.fillText('PE', chartX + barW/2, chartY + 20);
+            ctx.fillText('KE', chartX + barW + gap + barW/2, chartY + 20);
+            ctx.fillText('Total', chartX + (barW + gap)*2 + barW/2, chartY + 20);
+
+            // Values
+            ctx.font = '12px math-font';
+            ctx.fillText(state.energyPot.toFixed(1)+'J', chartX + barW/2, chartY - hPE - 5);
+            ctx.fillText(state.energyKin.toFixed(1)+'J', chartX + barW + gap + barW/2, chartY - hKE - 5);
+            ctx.fillText(state.energyTot.toFixed(1)+'J', chartX + (barW + gap)*2 + barW/2, chartY - hTot - 5);
+
+            if (state.freezeFrame) {
+                ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                ctx.fillRect(0,0,w,h);
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 24px Inter';
+                ctx.fillText("FROZEN", w/2, h/2);
+            }
+        }
+
+        // --- Scene 3 Rendering (Damping Chamber) ---
+        function drawScene3(w, h) {
+            const originX = w * 0.4;
+            const originY = 50;
+            const scaleY = 30;
+            const L = h * 0.4; // Pendulum string length
+            
+            // Angle based on linear displacement x assuming small angle x = L * theta -> theta = x/L
+            const theta = state.x / 5.0; // scale down for visual swinging
+            
+            const bobX = originX + L * Math.sin(theta);
+            const bobY = originY + L * Math.cos(theta);
+
+            // Draw fluid background based on damping
+            if (state.dampingMode !== 'none') {
+                const opacity = state.dampingMode === 'light' ? 0.1 : state.dampingMode === 'critical' ? 0.3 : 0.6;
+                ctx.fillStyle = `rgba(14, 165, 233, ${opacity})`; // sky-500
+                ctx.fillRect(originX - L, originY, L*2, L*1.5);
+
+                // Update & draw particles
+                if (state.playing) {
+                    if (Math.random() > 0.5) state.particles.push({x: originX - L + Math.random()*L*2, y: originY + L*1.5, s: 1+Math.random()*2});
+                    for (let i=0; i<state.particles.length; i++) {
+                        let p = state.particles[i];
+                        p.y -= p.s;
+                        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+                        ctx.beginPath(); ctx.arc(p.x, p.y, 2, 0, Math.PI*2); ctx.fill();
+                    }
+                    state.particles = state.particles.filter(p => p.y > originY);
+                }
+            }
+
+            // Draw Pivot
+            ctx.fillStyle = '#fff';
+            ctx.beginPath(); ctx.arc(originX, originY, 5, 0, Math.PI*2); ctx.fill();
+
+            // Draw String
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(originX, originY); ctx.lineTo(bobX, bobY); ctx.stroke();
+
+            // Draw Bob
+            ctx.fillStyle = '#ef4444'; // red-500
+            ctx.shadowColor = '#ef4444'; ctx.shadowBlur = 15;
+            ctx.beginPath(); ctx.arc(bobX, bobY, 20, 0, Math.PI*2); ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.strokeStyle = '#fff'; ctx.lineWidth=2; ctx.stroke();
+
+            // Draw Forcing Indicator
+            if (state.forcingEnabled) {
+                const forcePhase = state.drivingFreq * state.time;
+                const arrowX = originX + 100 * Math.cos(forcePhase);
+                drawArrow(originX, originY - 30, 40 * Math.cos(forcePhase), '#d946ef', 'Forcing');
+                
+                // Show resonance dial logic visually
+                ctx.fillStyle = 'rgba(217, 70, 239, 0.2)';
+                ctx.beginPath(); ctx.arc(originX, originY, 40, 0, Math.PI); ctx.fill();
+                ctx.strokeStyle = '#d946ef';
+                ctx.beginPath(); ctx.moveTo(originX, originY); ctx.lineTo(originX + 40*Math.cos(forcePhase), originY - 40*Math.sin(forcePhase)); ctx.stroke();
+            }
+
+            // Graph Displacement envelope
+            const graphX = originX + L + 40;
+            const graphW = w - graphX - 40;
+            drawTimeseriesGraph(graphX, originY + L/2, graphW, 100, 'x', '#22d3ee', scaleY);
+            
+            // Draw amplitude envelope lines over the graph
+            if (state.history.length > 2) {
+                ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+                ctx.setLineDash([5,5]);
+                ctx.beginPath(); ctx.moveTo(graphX, originY+L/2 - state.A*scaleY); ctx.lineTo(graphX+graphW, originY+L/2 - state.A*scaleY); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(graphX, originY+L/2 + state.A*scaleY); ctx.lineTo(graphX+graphW, originY+L/2 + state.A*scaleY); ctx.stroke();
+                ctx.setLineDash([]);
+            }
+        }
+
+
+        // --- UI & Interaction Logic ---
+        function togglePlay() {
+            state.playing = !state.playing;
+            document.getElementById('icon-play').innerHTML = state.playing 
+                ? '<rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect>' // Pause Icon
+                : '<polygon points="5 3 19 12 5 21 5 3"></polygon>'; // Play Icon
+        }
+
+        function resetSim() {
+            state.time = 0;
+            state.x = state.A;
+            state.v = 0;
+            state.history = [];
+            state.particles = [];
+            updateDerivedPhysics();
+            if (!state.playing) draw();
+        }
+
+        function setSimSpeed(val) {
+            state.simSpeed = val;
+            document.querySelectorAll('.sim-speed-btn').forEach(b => {
+                b.classList.remove('bg-cyan-600', 'text-white');
+                b.classList.add('bg-slate-800', 'text-xs');
+            });
+            event.target.classList.remove('bg-slate-800');
+            event.target.classList.add('bg-cyan-600', 'text-white');
+        }
+
+        function changeScene(s) {
+            state.scene = s;
+            resetSim();
+            
+            // Update Tabs UI
+            [1,2,3].forEach(i => {
+                const tab = document.getElementById(`tab-${i}`);
+                if (i === s) {
+                    tab.classList.remove('text-slate-400', 'hover:text-slate-200');
+                    tab.classList.add('bg-cyan-600', 'text-white');
+                } else {
+                    tab.classList.add('text-slate-400', 'hover:text-slate-200');
+                    tab.classList.remove('bg-cyan-600', 'text-white');
+                }
+            });
+
+            // Update Formulas logic
+            document.getElementById('energy-formulas').style.display = (s===2) ? 'block' : 'none';
+
+            buildUI();
+        }
+
+        function buildUI() {
+            const controlsDiv = document.getElementById('scene-controls');
+            const challengesDiv = document.getElementById('challenges-container');
+            
+            // 1. Controls
+            let controlsHTML = '';
+            if (state.scene === 1) {
+                controlsHTML = `
+                    <label class="flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded text-sm cursor-pointer border border-slate-700">
+                        <input type="checkbox" checked onchange="state.showVectors = this.checked"> Vectors
+                    </label>
+                    <label class="flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded text-sm cursor-pointer border border-slate-700">
+                        <input type="checkbox" checked onchange="state.showPhasor = this.checked"> Phasor Circle
+                    </label>
+                `;
+            } else if (state.scene === 2) {
+                controlsHTML = `
+                    <button onclick="state.freezeFrame = !state.freezeFrame" class="bg-fuchsia-600 px-3 py-1.5 rounded text-sm font-semibold border border-fuchsia-500">
+                        Toggle Freeze Frame
+                    </button>
+                `;
+            } else if (state.scene === 3) {
+                controlsHTML = `
+                    <select onchange="state.dampingMode = this.value; resetSim();" class="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm outline-none focus:border-cyan-500">
+                        <option value="none">No Damping</option>
+                        <option value="light">Light Damping</option>
+                        <option value="critical">Critical Damping</option>
+                        <option value="heavy">Heavy Damping</option>
+                    </select>
+                    <div class="flex items-center gap-2 bg-slate-800 px-3 py-1 rounded border border-slate-700">
+                        <input type="checkbox" id="forceToggle" onchange="state.forcingEnabled = this.checked"> 
+                        <label for="forceToggle" class="text-sm">Forcing Freq:</label>
+                        <input type="range" class="w-24" min="0.5" max="10" step="0.1" value="3.16" oninput="state.drivingFreq = parseFloat(this.value); document.getElementById('df-val').innerText=this.value+'Hz'">
+                        <span id="df-val" class="text-xs text-fuchsia-400 font-mono w-10">3.16Hz</span>
+                    </div>
+                `;
+            }
+            controlsDiv.innerHTML = controlsHTML;
+
+            // 2. Challenges
+            let challengesHTML = '';
+            challengesData[state.scene].forEach((ch, idx) => {
+                challengesHTML += `
+                    <div class="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
+                        <button onclick="toggleAnswer('ans-${idx}')" class="w-full text-left p-3 text-sm font-semibold text-slate-200 hover:bg-slate-750 flex justify-between items-center transition-colors">
+                            <span>Q: ${ch.q}</span>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                        </button>
+                        <div id="ans-${idx}" class="hidden p-3 text-sm text-cyan-200 bg-slate-900 border-t border-slate-700 leading-relaxed">
+                            <strong>A:</strong> ${ch.a}
+                        </div>
+                    </div>
+                `;
+            });
+            challengesDiv.innerHTML = challengesHTML;
+        }
+
+        function toggleAnswer(id) {
+            const el = document.getElementById(id);
+            if (el.classList.contains('hidden')) {
+                el.classList.remove('hidden');
+                el.classList.add('animate-[fadeIn_0.3s_ease-out]');
+                if (!state.badges.has('Curious Mind')) unlockBadge('Curious Mind', '🧠');
+            } else {
+                el.classList.add('hidden');
+            }
+        }
+
+        // --- Gamification Logic ---
+        function unlockBadge(name, icon) {
+            state.badges.add(name);
+            const container = document.getElementById('badge-container');
+            const badge = document.createElement('div');
+            badge.className = 'flex items-center gap-1 bg-gradient-to-r from-yellow-600/50 to-amber-500/50 border border-yellow-500/50 px-2 py-1 rounded text-xs font-bold text-yellow-100 animate-[fadeIn_0.5s_ease-out] shadow-[0_0_10px_rgba(234,179,8,0.3)]';
+            badge.innerHTML = `<span>${icon}</span> ${name}`;
+            container.appendChild(badge);
+        }
+
+        // --- Quiz Logic ---
+        function openQuiz() {
+            const modal = document.getElementById('quiz-modal');
+            const container = document.getElementById('quiz-question-container');
+            const data = quizzes[state.scene];
+            
+            modal.classList.remove('hidden');
+            setTimeout(() => modal.classList.remove('opacity-0'), 10);
+
+            let html = `<p class="text-lg font-medium text-slate-200 mb-4">${data.q}</p><div class="space-y-2">`;
+            data.opts.forEach((opt, i) => {
+                html += `<button onclick="checkQuiz(${i}, ${data.ans})" class="w-full text-left p-3 rounded bg-slate-700 hover:bg-slate-600 transition-colors border border-slate-600 focus:outline-none focus:border-cyan-500" id="opt-${i}">${opt}</button>`;
+            });
+            html += `</div>`;
+            container.innerHTML = html;
+            document.getElementById('quiz-feedback').classList.add('hidden');
+        }
+
+        function checkQuiz(selected, correct) {
+            const feedback = document.getElementById('quiz-feedback');
+            feedback.classList.remove('hidden', 'bg-green-600', 'bg-red-600');
+            
+            // Reset styles
+            for(let i=0; i<4; i++) {
+                let btn = document.getElementById(`opt-${i}`);
+                if(btn) { btn.classList.remove('bg-green-600', 'bg-red-600', 'border-green-500', 'border-red-500'); btn.disabled = true;}
+            }
+
+            if (selected === correct) {
+                document.getElementById(`opt-${selected}`).classList.add('bg-green-600', 'border-green-500');
+                feedback.innerText = "Correct! Great job.";
+                feedback.classList.add('bg-green-600/20', 'text-green-400');
+                if (!state.badges.has('Quiz Master')) unlockBadge('Quiz Master', '🏆');
+            } else {
+                document.getElementById(`opt-${selected}`).classList.add('bg-red-600', 'border-red-500');
+                document.getElementById(`opt-${correct}`).classList.add('bg-green-600', 'border-green-500'); // show correct
+                feedback.innerText = "Not quite. Review the Formula Reference panel!";
+                feedback.classList.add('bg-red-600/20', 'text-red-400');
+                
+                // Shake animation
+                const content = document.getElementById('quiz-content');
+                content.classList.add('animate-[shake_0.4s_ease-in-out]');
+                setTimeout(() => content.classList.remove('animate-[shake_0.4s_ease-in-out]'), 400);
+            }
+        }
+
+        function closeQuiz() {
+            const modal = document.getElementById('quiz-modal');
+            modal.classList.add('opacity-0');
+            setTimeout(() => modal.classList.add('hidden'), 300);
+        }
+
+        // Add tailwind keyframes for shake manually since CDN tailwind doesn't have it natively easily accessible in JIT mode without config
+        const style = document.createElement('style');
+        style.innerHTML = `
+            @keyframes shake {
+                0%, 100% { transform: translateX(0); }
+                25% { transform: translateX(-10px); }
+                75% { transform: translateX(10px); }
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Start App
+        init();
+
+    </script>
+</body>
+</html>
